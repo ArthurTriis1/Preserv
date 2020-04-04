@@ -1,0 +1,190 @@
+import React, {useState, useEffect} from 'react';
+import { View, TouchableOpacity, Image, Text, ActivityIndicator } from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
+import {useNavigation} from '@react-navigation/native'
+import logoImg from '../../assets/logo.png'
+import MapView, {Marker, Callout} from 'react-native-maps';
+import styles from "./styles"
+
+import SelectLayer from '../../components/SelectLayer'
+import SelectBairro from '../../components/SelectBairro'
+
+
+import apiGov from '../../services/apiGov'
+
+
+export default function GpsPage() {
+
+    
+
+    const[region, setRegion] = useState({
+        latitude:  -8.063169,
+        longitude: -34.871139,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    });
+    
+    //#region Estados
+    const [loading, setLoading] = useState(true);
+    const [dropped, setDropped] = useState(false);
+    const [bairros, setBairros] = useState([]);
+
+    const [layerPreservativos, setLayerPreservativos] = useState([]);
+    const [preserv, setPreserv] = useState(false)
+
+    const [layerTeste, setLayerTeste] = useState([]);
+    const [teste, setTeste] = useState(false)
+    
+    const [layerPrevencao, setLayerPrevencao] = useState([]);
+    const [prevencao, setPrevencao] = useState(false)
+
+    const [layerTratamento, setLayerTratamento] = useState([]);
+    const [tratamento, setTratamento] = useState(false)
+    //#endregion
+
+    useEffect(()=>{
+        apiGov.get('datastore_search_sql?sql=SELECT%20distinct%20bairro%20from%20"e21b7420-de0f-4130-ac90-c6d5a08f84a2"order%20by%20bairro')
+            .then((resp) => {
+                const results = resp.data.result.records.map((r) => {return r['bairro']});
+                setBairros(results);
+            })
+        apiGov.get('datastore_search_sql?sql=SELECT%20servico,bairro,fone,nome_oficial,longitude,latitude%20from%20"e21b7420-de0f-4130-ac90-c6d5a08f84a2"')
+            .then((resp) => {
+                const results = resp.data.result.records;
+                setLayerPreservativos(results);
+            })
+        apiGov.get('datastore_search?resource_id=7f3a2046-1372-4e6f-b269-802bf17ef832&limit=5')
+            .then((resp) => {
+                const results = resp.data.result.records;
+                setLayerTeste(results);
+            })
+        apiGov.get('datastore_search?resource_id=9aa8298b-8ffb-4801-a7d5-461d44f3ee24&limit=5')
+            .then((resp) => {
+                const results = resp.data.result.records;
+                setLayerPrevencao(results);
+            })
+        apiGov.get('datastore_search?resource_id=7f3a2046-1372-4e6f-b269-802bf17ef832&limit=5')
+        .then((resp) => {
+            const results = resp.data.result.records;
+            setLayerTratamento(results);
+        })
+
+    },[] );
+ 
+
+    navigation = useNavigation();
+
+    function navigateBack(){
+        navigation.goBack();
+    } 
+
+
+    return (
+        <View style={styles.container}> 
+
+            <View style={styles.header}>
+                <TouchableOpacity onPress={navigateBack} style={styles.returnButtomOut}>
+                    <Feather name="arrow-left" size={34} style={styles.returnButtom} color="#510073"/>
+                </TouchableOpacity>
+                <Image source={logoImg} style={styles.logoHeader}/>
+            </View>
+            
+            
+            <View style={styles.containerMap}>
+                <MapView style={styles.mapStyle} 
+                        initialRegion={region}
+                        region={region}
+                        onRegionChangeComplete={()=>{setLoading(false)}}
+                        onRegionChange={(reg)=>{setLoading(true); setRegion({reg})}}>
+                        
+                        {/* Layer de Preservativos */}
+                        {preserv &&
+                            layerPreservativos.map(marker => (
+                                <Marker
+                                    pinColor= "#510073"
+                                    coordinate={{   
+                                                    latitude: Number(marker.latitude),
+                                                    longitude: Number(marker.longitude)
+                                                }}
+                                />
+                        ))}
+
+                        {/* Layer de Testes */}
+                        {teste &&
+                        layerTeste.map(marker => (
+                            <Marker
+                                pinColor= "#510073"
+                                coordinate={{   
+                                                latitude: Number(marker.latitude),
+                                                longitude: Number(marker.longitude)
+                                            }}
+                                key={marker._id}
+                            />
+                        ))}
+
+                        {/* Layer de Prevencao */}
+                        {prevencao &&
+                        layerPrevencao.map(marker => (
+                            <Marker
+                                pinColor= "#510073"
+                                coordinate={{   
+                                                latitude: Number(marker.latitude),
+                                                longitude: Number(marker.longitude)
+                                            }}
+                                key={marker._id}
+                            />
+                        ))}
+
+                        {/* Layer de Tratamento */}
+                        {tratamento &&
+                        layerTratamento.map(marker => (
+                            <Marker
+                                pinColor= "#510073"
+                                coordinate={{   
+                                                latitude: Number(marker.latitude),
+                                                longitude: Number(marker.longitude)
+                                            }}
+                                key={marker._id}
+                            />
+                        ))}
+
+
+
+
+
+                </MapView>
+
+                {loading && <ActivityIndicator size="large" color="#510073" style={styles.loading}/>}
+
+                <View style={styles.containerOptions}>
+                    <SelectLayer style={styles.select} name="PRESERVATIVO"          call={(data) => {setPreserv(data.show)}}    />
+                    <SelectLayer style={styles.select} name="TESTE DE IST"          call={(data) => {setTeste(data.show)}}      />
+                    <SelectLayer style={styles.select} name="PREVENÇÃO DE URGÊNCIA" call={(data) => {setPrevencao(data.show)}}  />
+                    <SelectLayer style={styles.select} name="Tratamento"            call={(data) => {
+                        setTratamento(data.show)
+                        }} />
+                </View>
+
+                
+                <View style={[styles.inputsLocal, dropped && {height: 450}]}>
+
+                    <View style={styles.TargetIconOut}>
+                        <View style={styles.TargetIconIn}>
+                            <MaterialCommunityIcons name='target' style={styles.TargetIcon}></MaterialCommunityIcons>
+                        </View>
+                    </View>
+
+                    <SelectBairro style={styles.bairro} 
+                                  bairros={bairros} 
+                                  stateChange={(callback => setDropped(callback))}
+                                  callGo={(data)=>setRegion(data)}/>
+                    
+
+                </View>
+            
+                
+            </View>
+            
+        </View>
+    );
+}
