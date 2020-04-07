@@ -9,13 +9,16 @@ import styles from "./styles"
 import SelectLayer from '../../components/SelectLayer'
 import SelectBairro from '../../components/SelectBairro'
 
+import * as Location from 'expo-location';
+import * as Permissions from 'expo-permissions';
+
 
 import apiGov from '../../services/apiGov'
 
 
 export default function GpsPage() {
 
-    
+    const navigation = useNavigation();
 
     const[region, setRegion] = useState({
         latitude:  -8.063169,
@@ -42,13 +45,45 @@ export default function GpsPage() {
     const [tratamento, setTratamento] = useState(false)
     //#endregion
 
+
+    async function getGeolocation(){
+        let { status } = await Permissions.askAsync(Permissions.LOCATION);
+        if (status !== 'granted') {
+            console.error("deu ruim")
+        }
+    
+        let location = await Location.getCurrentPositionAsync({});
+
+        return{
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+        }
+    }
+
+    function plotMap(layer){
+        return (layer.map(marker => (
+            <Marker
+                pinColor= "#510073"
+                coordinate={{   
+                                latitude: Number(marker.latitude),
+                                longitude: Number(marker.longitude)
+                            }}
+                key={"teste"+marker._id}
+                onPress={() =>{ navigation.navigate('DetailsLocation', marker)}}
+
+                
+            />)
+        ))
+    }
+
     useEffect(()=>{
         apiGov.get('datastore_search_sql?sql=SELECT%20distinct%20bairro%20from%20"e21b7420-de0f-4130-ac90-c6d5a08f84a2"order%20by%20bairro')
             .then((resp) => {
                 const results = resp.data.result.records.map((r) => {return r['bairro']});
                 setBairros(results);
+                
             })
-        apiGov.get('datastore_search_sql?sql=SELECT%20servico,bairro,fone,nome_oficial,longitude,latitude%20from%20"e21b7420-de0f-4130-ac90-c6d5a08f84a2"')
+        apiGov.get('datastore_search_sql?sql=SELECT%20servico,bairro,fone,nome_oficial,servico,endereço,longitude,latitude,_id%20from%20"e21b7420-de0f-4130-ac90-c6d5a08f84a2"')
             .then((resp) => {
                 const results = resp.data.result.records;
                 setLayerPreservativos(results);
@@ -69,10 +104,9 @@ export default function GpsPage() {
             setLayerTratamento(results);
         })
 
-    },[] );
+    },[]);
  
 
-    navigation = useNavigation();
 
     function navigateBack(){
         navigation.goBack();
@@ -92,87 +126,56 @@ export default function GpsPage() {
             
             <View style={styles.containerMap}>
                 <MapView style={styles.mapStyle} 
-                        initialRegion={region}
+                        initialRegion={{
+                            latitude:  -8.063169,
+                            longitude: -34.871139,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                        }}
                         region={region}
                         onRegionChangeComplete={()=>{setLoading(false)}}
                         onRegionChange={(reg)=>{setLoading(true); setRegion({reg})}}>
                         
                         {/* Layer de Preservativos */}
-                        {preserv &&
-                            layerPreservativos.map(marker => (
-                                <Marker
-                                    pinColor= "#510073"
-                                    coordinate={{   
-                                                    latitude: Number(marker.latitude),
-                                                    longitude: Number(marker.longitude)
-                                                }}
-                                />
-                        ))}
+                        {preserv && plotMap(layerPreservativos)}
 
                         {/* Layer de Testes */}
-                        {teste &&
-                        layerTeste.map(marker => (
-                            <Marker
-                                pinColor= "#510073"
-                                coordinate={{   
-                                                latitude: Number(marker.latitude),
-                                                longitude: Number(marker.longitude)
-                                            }}
-                                key={marker._id}
-                            />
-                        ))}
+                        {teste && plotMap(layerTeste)}
 
                         {/* Layer de Prevencao */}
-                        {prevencao &&
-                        layerPrevencao.map(marker => (
-                            <Marker
-                                pinColor= "#510073"
-                                coordinate={{   
-                                                latitude: Number(marker.latitude),
-                                                longitude: Number(marker.longitude)
-                                            }}
-                                key={marker._id}
-                            />
-                        ))}
+                        {prevencao && plotMap(layerPrevencao)}
 
                         {/* Layer de Tratamento */}
-                        {tratamento &&
-                        layerTratamento.map(marker => (
-                            <Marker
-                                pinColor= "#510073"
-                                coordinate={{   
-                                                latitude: Number(marker.latitude),
-                                                longitude: Number(marker.longitude)
-                                            }}
-                                key={marker._id}
-                            />
-                        ))}
-
-
-
-
+                        {tratamento && plotMap(layerTratamento)}
 
                 </MapView>
 
-                {loading && <ActivityIndicator size="large" color="#510073" style={styles.loading}/>}
+                {loading && <ActivityIndicator size="large" color="#510073" style={styles.loading}/> }
 
-                <View style={styles.containerOptions}>
+                <View style={[styles.containerOptions, loading &&  styles.lowOpacity]}>
                     <SelectLayer style={styles.select} name="PRESERVATIVO"          call={(data) => {setPreserv(data.show)}}    />
                     <SelectLayer style={styles.select} name="TESTE DE IST"          call={(data) => {setTeste(data.show)}}      />
                     <SelectLayer style={styles.select} name="PREVENÇÃO DE URGÊNCIA" call={(data) => {setPrevencao(data.show)}}  />
-                    <SelectLayer style={styles.select} name="Tratamento"            call={(data) => {
-                        setTratamento(data.show)
-                        }} />
+                    <SelectLayer style={styles.select} name="Tratamento"            call={(data) => {setTratamento(data.show)}} />
                 </View>
 
                 
-                <View style={[styles.inputsLocal, dropped && {height: 450}]}>
-
-                    <View style={styles.TargetIconOut}>
-                        <View style={styles.TargetIconIn}>
-                            <MaterialCommunityIcons name='target' style={styles.TargetIcon}></MaterialCommunityIcons>
+                <View style={[styles.inputsLocal, dropped && {height: 450}, loading &&  styles.lowOpacity]}>
+                    <TouchableOpacity onPress={async ()=>{
+                           const location = await getGeolocation();
+                           setRegion({
+                            latitude:  location.latitude,
+                            longitude: location.longitude,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                            })
+                        }}>
+                        <View style={styles.TargetIconOut}>
+                            <View style={styles.TargetIconIn}>
+                                <MaterialCommunityIcons name='target' style={styles.TargetIcon}></MaterialCommunityIcons>
+                            </View>
                         </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <SelectBairro style={styles.bairro} 
                                   bairros={bairros} 

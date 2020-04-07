@@ -97,6 +97,10 @@ export default StyleSheet.create({
         position: 'absolute',
         alignSelf: 'center',
         top: '40%'
+    },
+
+    lowOpacity:{
+        opacity: 0.6
     }
 
     
